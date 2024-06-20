@@ -4,7 +4,6 @@ import { withAccelerate } from "@prisma/extension-accelerate";
 import { sign, verify } from "hono/jwt";
 import { createBlogInput, updateBlogInput } from "@aditya-codes/easy-common";
 
-
 export const blogRouter = new Hono<{
   Bindings: {
     DATABASE_URL: string;
@@ -18,7 +17,7 @@ export const blogRouter = new Hono<{
 blogRouter.use("/*", async (c, next) => {
   const authHeader = c.req.header("authorization") || "";
   const user = await verify(authHeader, c.env.JWT_SECRET);
-  try{
+  try {
     if (user) {
       c.set("userId", user.id);
       await next();
@@ -28,24 +27,23 @@ blogRouter.use("/*", async (c, next) => {
         message: "You are not authorized",
       });
     }
-  } 
-  catch(e){
-    c.status(403)
+  } catch (e) {
+    c.status(403);
     return c.json({
-      message: "You are not logged in"
-    })
+      message: "You are not logged in",
+    });
   }
 });
 
 blogRouter.post("/", async (c) => {
   const body = await c.req.json();
   const authorId = c.get("userId");
-  const {success} = createBlogInput.safeParse(body);
-  if(!success){
+  const { success } = createBlogInput.safeParse(body);
+  if (!success) {
     c.status(411);
     return c.json({
-      message: "Invalid Input"
-    })
+      message: "Invalid Input",
+    });
   }
   const prisma = new PrismaClient({
     datasourceUrl: c.env.DATABASE_URL,
@@ -64,12 +62,12 @@ blogRouter.post("/", async (c) => {
 
 blogRouter.put("/", async (c) => {
   const body = await c.req.json();
-  const {success} = updateBlogInput.safeParse(body);
-  if(!success){
+  const { success } = updateBlogInput.safeParse(body);
+  if (!success) {
     c.status(411);
     return c.json({
-      message: "Invalid Inputs"
-    })
+      message: "Invalid Inputs",
+    });
   }
   const prisma = new PrismaClient({
     datasourceUrl: c.env.DATABASE_URL,
@@ -92,7 +90,18 @@ blogRouter.get("/bulk", async (c) => {
   const prisma = new PrismaClient({
     datasourceUrl: c.env.DATABASE_URL,
   }).$extends(withAccelerate());
-  const blogs = await prisma.post.findMany();
+  const blogs = await prisma.post.findMany({
+    select: {
+      content: true,
+      title: true,
+      id: true,
+      author: {
+        select: {
+          name: true,
+        },
+      },
+    },
+  });
   return c.json({
     blogs,
   });
@@ -108,6 +117,16 @@ blogRouter.get("/:id", async (c) => {
       where: {
         id: id,
       },
+      select: {
+        id: true,
+        title: true,
+        content: true,
+        author: {
+          select: {
+            name: true,
+          },
+        },
+      },
     });
     return c.json({
       id: post,
@@ -119,4 +138,3 @@ blogRouter.get("/:id", async (c) => {
     });
   }
 });
-
